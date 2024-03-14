@@ -133,6 +133,82 @@ class AirConditionerDock(QDockWidget):
         mqtt_sender.client.publish(topic, message)
 
 
+class PresenceDock(QDockWidget):
+    def __init__(self):
+        super().__init__("Presence")
+        self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.setFeatures(QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable)
+        self.init_ui()
+
+    def init_ui(self):
+        widget = QWidget()
+        layout = QVBoxLayout()
+
+        table_layout = QHBoxLayout()
+        self.table_label = QLabel("Table Number:")
+        self.table_number_input = QSpinBox()
+        self.table_number_input.setMinimum(1)
+        self.table_number_input.setMaximum(9999)
+        table_layout.addWidget(self.table_label)
+        table_layout.addWidget(self.table_number_input)
+        layout.addLayout(table_layout)
+
+        button_layout = QHBoxLayout()
+        self.send_occupied_button = QPushButton("Send Occupied")
+        self.send_occupied_button.clicked.connect(lambda: self.send_presence_message(True))
+        button_layout.addWidget(self.send_occupied_button)
+
+        self.send_not_occupied_button = QPushButton("Send Not Occupied")
+        self.send_not_occupied_button.clicked.connect(lambda: self.send_presence_message(False))
+        button_layout.addWidget(self.send_not_occupied_button)
+        layout.addLayout(button_layout)
+
+        widget.setLayout(layout)
+        self.setWidget(widget)
+
+    def send_presence_message(self, is_occupied):
+        table_number = self.table_number_input.value()
+        topic = "tables/occupied"
+        message = f'{{"table_number": {table_number}, "is_occupied": {str(is_occupied).lower()}}}'
+        print("Sending Presence Message:", message)
+        mqtt_sender.client.publish(topic, message)
+
+
+class CallWaiterDock(QDockWidget):
+    def __init__(self):
+        super().__init__("Call Waiter")
+        self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.setFeatures(QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable)
+        self.init_ui()
+
+    def init_ui(self):
+        widget = QWidget()
+        layout = QVBoxLayout()
+
+        table_layout = QHBoxLayout()
+        self.table_label = QLabel("Table Number:")
+        self.table_number_input = QSpinBox()
+        self.table_number_input.setMinimum(1)
+        self.table_number_input.setMaximum(9999)
+        table_layout.addWidget(self.table_label)
+        table_layout.addWidget(self.table_number_input)
+        layout.addLayout(table_layout)
+
+        self.call_waiter_button = QPushButton("Call a Waiter")
+        self.call_waiter_button.clicked.connect(self.send_call_waiter_message)
+        layout.addWidget(self.call_waiter_button)
+
+        widget.setLayout(layout)
+        self.setWidget(widget)
+
+    def send_call_waiter_message(self):
+        table_number = self.table_number_input.value()
+        topic = "tables/waiter_call"
+        message = f'{{"table_number": {table_number}, "request": "call_waiter"}}'
+        print("Sending Call Waiter Message:", message)
+        mqtt_sender.client.publish(topic, message)
+
+
 class MqttSender(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -144,11 +220,15 @@ class MqttSender(QMainWindow):
         self.temperature_dock = TemperatureDock()
         self.light_dock = LightDock()
         self.ac_dock = AirConditionerDock()
+        self.presence_dock = PresenceDock()
+        self.call_waiter_dock = CallWaiterDock()
 
         # Add dock widgets to the main window
         self.addDockWidget(Qt.LeftDockWidgetArea, self.temperature_dock)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.light_dock)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.ac_dock)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.presence_dock)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.call_waiter_dock)
 
         # Connect to MQTT broker
         self.client = mqtt.Client()

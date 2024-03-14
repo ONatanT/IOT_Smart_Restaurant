@@ -8,6 +8,7 @@ from PyQt5.QtCore import *
 import paho.mqtt.client as mqtt
 import socket
 import json
+import  bisect
 
 # Import MQTT initialization parameters from mqtt_init.py
 from mqtt_init import *
@@ -16,11 +17,15 @@ from mqtt_init import *
 table_temperatures = {}
 table_lights = {}
 table_air_conditioners = {}
+table_waiter_calls = {}
+table_presence = {}
 
 class Mqtt_client(QtCore.QObject):
     temperature_updated = QtCore.pyqtSignal(int, int)
     light_updated = QtCore.pyqtSignal(int, bool)
     air_conditioner_updated = QtCore.pyqtSignal(int, bool)
+    waiter_call_received = QtCore.pyqtSignal(int)
+    table_presence_updated = QtCore.pyqtSignal(int, bool)
 
     def __init__(self):
         super().__init__()
@@ -37,6 +42,8 @@ class Mqtt_client(QtCore.QObject):
         self.temperature_topic = "tables/tmp"
         self.light_topic = "tables/light"
         self.air_conditioner_topic = "tables/air_conditioner"
+        self.waiter_call_topic = "tables/waiter_call"
+        self.table_presence_topic = "tables/occupied"
 
         # Creating MQTT client instance
         self.client = mqtt.Client(self.clientname, clean_session=True)
@@ -45,15 +52,20 @@ class Mqtt_client(QtCore.QObject):
         self.client.on_disconnect = self.on_disconnect
         self.client.on_message = self.on_message
 
+        # Initialize sorted table numbers list
+        self.sorted_table_numbers = []
+
         # Connect signals to slots
         self.temperature_updated.connect(self.update_temperature_slot)
         self.light_updated.connect(self.update_light_slot)
         self.air_conditioner_updated.connect(self.update_air_conditioner_slot)
+        self.waiter_call_received.connect(self.receive_waiter_call_slot)
+        self.table_presence_updated.connect(self.update_table_presence_slot)
         
     def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             print("Connected to broker")
-            self.client.subscribe([(self.temperature_topic, 0), (self.light_topic, 0), (self.air_conditioner_topic, 0)])
+            self.client.subscribe(sub_topic, 0)
         else:
             print("Bad connection. Returned code=", rc)
             
@@ -78,6 +90,13 @@ class Mqtt_client(QtCore.QObject):
                 table_number = data["table_number"]
                 is_on = data["is_on"]
                 self.air_conditioner_updated.emit(table_number, is_on)
+            elif topic == self.waiter_call_topic:
+                table_number = data["table_number"]
+                self.waiter_call_received.emit(table_number)
+            elif topic == self.table_presence_topic:
+                table_number = data["table_number"]
+                is_occupied = data["is_occupied"]
+                self.table_presence_updated.emit(table_number, is_occupied)
         except json.JSONDecodeError:
             print("Invalid JSON format")
         except KeyError as e:
@@ -125,6 +144,30 @@ class Mqtt_client(QtCore.QObject):
         else:
             print(f"Table {table_number} does not exist in GUI dock. Adding it now.")
             mainwin.airConditionerDock.add_table_to_dock(table_number, is_on)
+
+    @QtCore.pyqtSlot(int)
+    def receive_waiter_call_slot(self, table_number):
+        print(f"Waiter call received from table {table_number}")
+        if table_number in table_waiter_calls:
+            # Remove the button only if it's present in the dock
+            button = table_waiter_calls[table_number]
+            button.deleteLater()
+            del table_waiter_calls[table_number]
+            mainwin.waiterCallDock.mc.sorted_table_numbers.remove(table_number)
+        else:
+            print(f"Table {table_number} does not exist in waiter call dock. Adding it now.")
+            mainwin.waiterCallDock.add_table_to_dock(table_number)
+
+    @QtCore.pyqtSlot(int, bool)
+    def update_table_presence_slot(self, table_number, is_occupied):
+        if is_occupied:
+            if table_number not in table_presence:
+                print(f"Table {table_number} is occupied.")
+                mainwin.presenceDock.add_table_to_dock(table_number)
+        else:
+            if table_number in table_presence:
+                print(f"Table {table_number} is vacant.")
+                mainwin.presenceDock.remove_table_from_dock(table_number)
 
 class TemperatureDock(QDockWidget):
     def __init__(self, mc):
@@ -226,6 +269,76 @@ class AirConditionerDock(QDockWidget):
 
         table_air_conditioners[table_number] = label
 
+class WaiterCallDock(QDockWidget):
+    def __init__(self, mc):
+        QDockWidget.__init__(self)
+
+        self.mc = mc
+
+        self.setWindowTitle("Waiter Calls")
+        self.setStyleSheet("background-color: white")
+        self.central_widget = QWidget()
+        self.setWidget(self.central_widget)
+        self.layout = QVBoxLayout(self.central_widget)
+
+        self.mc.waiter_call_received.connect(self.add_table_to_dock)
+
+
+    def add_table_to_dock(self, table_number):
+        print(f"Waiter call received from table {table_number}")
+        if table_number in table_waiter_calls:
+            print(f"Table {table_number} already exists in waiter call dock.")
+        else:
+            button = QPushButton(f"Table {table_number} - Call Dismissed")
+            button.clicked.connect(lambda: self.dismiss_call(table_number))
+
+            index = bisect.bisect_left(self.mc.sorted_table_numbers, table_number)
+            self.layout.insertWidget(index, button)
+
+            table_waiter_calls[table_number] = button
+            self.mc.sorted_table_numbers.append(table_number)
+            self.mc.sorted_table_numbers.sort()
+
+    def dismiss_call(self, table_number):
+        print(f"Dismissed waiter call from table {table_number}")
+        if table_number in table_waiter_calls:
+            button = table_waiter_calls[table_number]
+            button.deleteLater()
+            del table_waiter_calls[table_number]
+            self.mc.sorted_table_numbers.remove(table_number)
+        else:
+            print(f"Table {table_number} does not exist in waiter call dock.")
+
+class PresenceDock(QDockWidget):
+    def __init__(self, mc):
+        QDockWidget.__init__(self)
+
+        self.mc = mc
+
+        self.setWindowTitle("Table Presence")
+        self.setStyleSheet("background-color: white")
+        self.central_widget = QWidget()
+        self.setWidget(self.central_widget)
+        self.layout = QVBoxLayout(self.central_widget)
+
+    def add_table_to_dock(self, table_number):
+        label = QLabel(f"Table {table_number} - Occupied")
+
+        index = bisect.bisect_left(self.mc.sorted_table_numbers, table_number)
+        self.layout.insertWidget(index, label)
+
+        table_presence[table_number] = label
+        self.mc.sorted_table_numbers.append(table_number)
+        self.mc.sorted_table_numbers.sort()
+
+    def remove_table_from_dock(self, table_number):
+        if table_number in table_presence:
+            label = table_presence[table_number]
+            label.deleteLater()
+            del table_presence[table_number]
+            self.mc.sorted_table_numbers.remove(table_number)
+
+
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         QMainWindow.__init__(self, parent)
@@ -244,11 +357,15 @@ class MainWindow(QMainWindow):
         self.connectionDock = TemperatureDock(self.mc)
         self.lightDock = LightDock(self.mc)
         self.airConditionerDock = AirConditionerDock(self.mc)
+        self.waiterCallDock = WaiterCallDock(self.mc)
+        self.presenceDock = PresenceDock(self.mc)
 
         # Add docks to main window
         self.addDockWidget(Qt.LeftDockWidgetArea, self.connectionDock)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.lightDock)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.airConditionerDock)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.waiterCallDock)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.presenceDock)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
