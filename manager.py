@@ -7,9 +7,13 @@ from mqtt_init import broker_ip, broker_port, username, password, sub_topic
 conn = sqlite3.connect('restaurant.db')
 c = conn.cursor()
 c.execute('''CREATE TABLE IF NOT EXISTS temperature_data
-             (table_number INTEGER, temperature REAL)''')
+             (table_number INTEGER PRIMARY KEY, temperature REAL)''')
 c.execute('''CREATE TABLE IF NOT EXISTS occupancy_data
-             (table_number INTEGER, is_occupied BOOLEAN)''')
+             (table_number INTEGER PRIMARY KEY, is_occupied BOOLEAN)''')
+c.execute('''CREATE TABLE IF NOT EXISTS light_data
+             (table_number INTEGER PRIMARY KEY, is_on BOOLEAN)''')
+c.execute('''CREATE TABLE IF NOT EXISTS ac_data
+             (table_number INTEGER PRIMARY KEY, is_on BOOLEAN)''')
 conn.commit()
 
 # MQTT Client setup
@@ -25,7 +29,10 @@ def on_message(client, userdata, message):
         handle_temperature(payload)
     if "occupied" in topic:
         handle_occupancy(payload)
-
+    if "light" in topic:
+        handle_light(payload)
+    if "air_conditioner" in topic:
+        handle_ac(payload)
 
 # Function to handle temperature data
 def handle_temperature(data):
@@ -35,8 +42,8 @@ def handle_temperature(data):
 
     print(f"Received temperature data for table {table_number}: {temperature}")
 
-    # Update database
-    c.execute("INSERT INTO temperature_data VALUES (?, ?)", (table_number, temperature))
+    # Update or insert into database
+    c.execute("INSERT OR REPLACE INTO temperature_data VALUES (?, ?)", (table_number, temperature))
     conn.commit()
 
     # Check temperature threshold and control AC
@@ -54,19 +61,9 @@ def handle_temperature(data):
 
 # Function to handle occupancy data
 def handle_occupancy(data):
-    print(f"{data=}")
     table_number = data["table_number"]
     is_occupied = data["is_occupied"]
     occupancy_topic_send = "tables/light"
-
-
-    print(f"Received occupancy data for table {table_number}: {is_occupied}")
-
-    # Update database
-    c.execute("INSERT INTO occupancy_data VALUES (?, ?)", (table_number, is_occupied))
-    conn.commit()
-
-    # Control light based on occupancy
     if is_occupied:
         print(f"Table {table_number} is occupied, turning on light.")
         message = f'{{"table_number": {table_number}, "is_on": {str(True).lower()}}}'
@@ -78,6 +75,34 @@ def handle_occupancy(data):
         client.publish(occupancy_topic_send, message)
         print("Light control message sent.")
 
+    print(f"Received occupancy data for table {table_number}: {is_occupied}")
+    # Update or insert into database
+    c.execute("INSERT OR REPLACE INTO occupancy_data VALUES (?, ?)", (table_number, is_occupied))
+    conn.commit()
+
+
+# Function to handle light data
+def handle_light(data):
+    table_number = data["table_number"]
+    is_on = data["is_on"]
+
+    print(f"Received light data for table {table_number}: {is_on}")
+
+    # Update or insert into database
+    c.execute("INSERT OR REPLACE INTO light_data VALUES (?, ?)", (table_number, is_on))
+    conn.commit()
+
+
+# Function to handle air conditioner data
+def handle_ac(data):
+    table_number = data["table_number"]
+    is_on = data["is_on"]
+
+    print(f"Received AC data for table {table_number}: {is_on}")
+
+    # Update or insert into database
+    c.execute("INSERT OR REPLACE INTO ac_data VALUES (?, ?)", (table_number, is_on))
+    conn.commit()
 
 # Setup MQTT client callbacks
 client.on_message = on_message
