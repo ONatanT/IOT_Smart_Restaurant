@@ -34,6 +34,7 @@ def on_message(client, userdata, message):
     if "air_conditioner" in topic:
         handle_ac(payload)
 
+#TODO: add warning message if tmp is above 40!
 # Function to handle temperature data
 def handle_temperature(data):
     table_number = data["table_number"]

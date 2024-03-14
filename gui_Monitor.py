@@ -111,6 +111,7 @@ class Mqtt_client(QtCore.QObject):
         self.client.disconnect()
         self.client.loop_stop()
 
+    #TODO: add a warning color to temp above 40 as a warning
     @QtCore.pyqtSlot(int, int)
     def update_temperature_slot(self, table_number, temperature):
         if table_number in table_temperatures:

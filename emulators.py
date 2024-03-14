@@ -1,9 +1,10 @@
-# mqtt_sender.py
 import sys
 import paho.mqtt.client as mqtt
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QPushButton, QWidget, QLabel, QSpinBox, QDockWidget, QHBoxLayout
 from PyQt5.QtCore import Qt
 from mqtt_init import *
+
+# TODO: convert temperature dock to DHT functionality
 
 class TemperatureDock(QDockWidget):
     def __init__(self):
