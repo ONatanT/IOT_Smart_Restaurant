@@ -117,7 +117,7 @@ class Mqtt_client(QtCore.QObject):
             table_temperatures[table_number].setText(f"Table: {table_number}, Temperature: {temperature} °C")
         else:
             print(f"Table {table_number} does not exist in GUI dock. Adding it now.")
-            mainwin.connectionDock.add_table_to_dock(table_number, temperature)
+            mainwin.TemperatureDock.add_table_to_dock(table_number, temperature)
 
     @QtCore.pyqtSlot(int, bool)
     def update_light_slot(self, table_number, is_on):
@@ -354,14 +354,14 @@ class MainWindow(QMainWindow):
         self.setWindowTitle('Restaurant Hub')
 
         # Init QDockWidget objects
-        self.connectionDock = TemperatureDock(self.mc)
+        self.TemperatureDock = TemperatureDock(self.mc)
         self.lightDock = LightDock(self.mc)
         self.airConditionerDock = AirConditionerDock(self.mc)
         self.waiterCallDock = WaiterCallDock(self.mc)
         self.presenceDock = PresenceDock(self.mc)
 
         # Add docks to main window
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.connectionDock)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.TemperatureDock)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.lightDock)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.airConditionerDock)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.waiterCallDock)
