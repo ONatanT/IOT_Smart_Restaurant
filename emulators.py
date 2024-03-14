@@ -1,7 +1,7 @@
 # mqtt_sender.py
 import sys
 import paho.mqtt.client as mqtt
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QPushButton, QWidget, QLabel, QSpinBox, QHBoxLayout, QDockWidget
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QPushButton, QWidget, QLabel, QSpinBox, QDockWidget, QHBoxLayout
 from PyQt5.QtCore import Qt
 from mqtt_init import *
 
@@ -16,18 +16,24 @@ class TemperatureDock(QDockWidget):
         widget = QWidget()
         layout = QVBoxLayout()
 
+        table_layout = QHBoxLayout()
+        self.table_label = QLabel("Table Number:")
         self.table_number_input = QSpinBox()
         self.table_number_input.setMinimum(1)
         self.table_number_input.setMaximum(9999)
-        layout.addWidget(QLabel("Table Number:"))
-        layout.addWidget(self.table_number_input)
+        table_layout.addWidget(self.table_label)
+        table_layout.addWidget(self.table_number_input)
+        layout.addLayout(table_layout)
 
+        temp_layout = QHBoxLayout()
+        self.temp_label = QLabel("Temperature:")
         self.temperature_input = QSpinBox()
         self.temperature_input.setMinimum(1)
         self.temperature_input.setMaximum(9999)
         self.temperature_input.setValue(25)
-        layout.addWidget(QLabel("Temperature:"))
-        layout.addWidget(self.temperature_input)
+        temp_layout.addWidget(self.temp_label)
+        temp_layout.addWidget(self.temperature_input)
+        layout.addLayout(temp_layout)
 
         send_button = QPushButton("Send Temperature")
         send_button.clicked.connect(self.send_temperature_message)
@@ -56,19 +62,24 @@ class LightDock(QDockWidget):
         widget = QWidget()
         layout = QVBoxLayout()
 
+        table_layout = QHBoxLayout()
+        self.table_label = QLabel("Table Number:")
         self.table_number_input = QSpinBox()
         self.table_number_input.setMinimum(1)
         self.table_number_input.setMaximum(9999)
-        layout.addWidget(QLabel("Table Number:"))
-        layout.addWidget(self.table_number_input)
+        table_layout.addWidget(self.table_label)
+        table_layout.addWidget(self.table_number_input)
+        layout.addLayout(table_layout)
 
+        button_layout = QHBoxLayout()
         self.send_on_button = QPushButton("Send Light ON")
         self.send_on_button.clicked.connect(lambda: self.send_light_message(True))
-        layout.addWidget(self.send_on_button)
+        button_layout.addWidget(self.send_on_button)
 
         self.send_off_button = QPushButton("Send Light OFF")
         self.send_off_button.clicked.connect(lambda: self.send_light_message(False))
-        layout.addWidget(self.send_off_button)
+        button_layout.addWidget(self.send_off_button)
+        layout.addLayout(button_layout)
 
         widget.setLayout(layout)
         self.setWidget(widget)
@@ -92,19 +103,24 @@ class AirConditionerDock(QDockWidget):
         widget = QWidget()
         layout = QVBoxLayout()
 
+        table_layout = QHBoxLayout()
+        self.table_label = QLabel("Table Number:")
         self.table_number_input = QSpinBox()
         self.table_number_input.setMinimum(1)
         self.table_number_input.setMaximum(9999)
-        layout.addWidget(QLabel("Table Number:"))
-        layout.addWidget(self.table_number_input)
+        table_layout.addWidget(self.table_label)
+        table_layout.addWidget(self.table_number_input)
+        layout.addLayout(table_layout)
 
+        button_layout = QHBoxLayout()
         self.send_on_button = QPushButton("Send AC ON")
         self.send_on_button.clicked.connect(lambda: self.send_ac_message(True))
-        layout.addWidget(self.send_on_button)
+        button_layout.addWidget(self.send_on_button)
 
         self.send_off_button = QPushButton("Send AC OFF")
         self.send_off_button.clicked.connect(lambda: self.send_ac_message(False))
-        layout.addWidget(self.send_off_button)
+        button_layout.addWidget(self.send_off_button)
+        layout.addLayout(button_layout)
 
         widget.setLayout(layout)
         self.setWidget(widget)
@@ -124,21 +140,15 @@ class MqttSender(QMainWindow):
         self.setWindowTitle("MQTT Message Sender")
         self.setGeometry(300, 300, 300, 200)
 
-        # Central Widget
-        central_layout = QVBoxLayout()
-        central_widget = QWidget()
-        central_widget.setLayout(central_layout)
-        self.setCentralWidget(central_widget)
-
         # Create instances of dock widgets
         self.temperature_dock = TemperatureDock()
         self.light_dock = LightDock()
         self.ac_dock = AirConditionerDock()
 
-        # Add dock widgets to the layout
-        central_layout.addWidget(self.temperature_dock)
-        central_layout.addWidget(self.light_dock)
-        central_layout.addWidget(self.ac_dock)
+        # Add dock widgets to the main window
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.temperature_dock)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.light_dock)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.ac_dock)
 
         # Connect to MQTT broker
         self.client = mqtt.Client()
