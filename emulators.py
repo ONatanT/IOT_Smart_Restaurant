@@ -112,22 +112,22 @@ class AirConditionerDock(QDockWidget):
         layout.addLayout(table_layout)
 
         button_layout = QHBoxLayout()
-        self.send_on_button = QPushButton("Send AC ON")
-        self.send_on_button.clicked.connect(lambda: self.send_ac_message(True))
+        self.send_on_button = QPushButton("Cooling")
+        self.send_on_button.clicked.connect(lambda: self.send_ac_message("Cooling"))
         button_layout.addWidget(self.send_on_button)
 
-        self.send_off_button = QPushButton("Send AC OFF")
-        self.send_off_button.clicked.connect(lambda: self.send_ac_message(False))
+        self.send_off_button = QPushButton("Heating")
+        self.send_off_button.clicked.connect(lambda: self.send_ac_message("Heating"))
         button_layout.addWidget(self.send_off_button)
         layout.addLayout(button_layout)
 
         widget.setLayout(layout)
         self.setWidget(widget)
 
-    def send_ac_message(self, is_on):
+    def send_ac_message(self, mode):
         table_number = self.table_number_input.value()
         topic = "tables/air_conditioner"
-        message = f'{{"table_number": {table_number}, "is_on": {str(is_on).lower()}}}'
+        message = f'{{"table_number": {table_number}, "mode": "{mode}"}}'
         print("Sending Air Conditioner Message:", message)
         mqtt_sender.client.publish(topic, message)
 
