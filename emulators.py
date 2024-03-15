@@ -223,7 +223,7 @@ class MqttSender(QMainWindow):
         self.call_waiter_dock = CallWaiterDock()
 
         # Add dock widgets to the main window
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.temperature_dock)
+        # self.addDockWidget(Qt.LeftDockWidgetArea, self.temperature_dock)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.light_dock)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.ac_dock)
         self.addDockWidget(Qt.LeftDockWidgetArea, self.presence_dock)

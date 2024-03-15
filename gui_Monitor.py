@@ -81,14 +81,10 @@ class Mqtt_client(QtCore.QObject):
         payload = str(msg.payload.decode("utf-8", "ignore"))
         print("Message from:", topic, payload)
         try:
-            print(f"{(topic)=}")
-            print(f"{(self.warning_topic)=}")
-            print(f"{(self.warning_topic == topic)=}")
-
-            data = json.loads(payload)
-            if self.warning_topic == topic:
-                print("********************************************")
-                self.warning_received.emit()
+            if self.warning_topic.lower() == topic.lower():
+                self.warning_received.emit(payload)
+            else:
+                data = json.loads(payload)
             if topic == self.temperature_topic:
                 table_number = data["table_number"]
                 temperature = data["temperature"]
@@ -123,7 +119,6 @@ class Mqtt_client(QtCore.QObject):
         self.client.disconnect()
         self.client.loop_stop()
 
-    # TODO: add a warning color to temp above 40 as a warning
     @QtCore.pyqtSlot(int, float)
     def update_temperature_slot(self, table_number, temperature):
         if table_number in table_temperatures:
@@ -185,8 +180,7 @@ class Mqtt_client(QtCore.QObject):
     @QtCore.pyqtSlot(str)
     def show_warning_popup(self, warning_message):
         print("Received warning message:", warning_message)
-        if "Temperature for table 1 is above 40°C!" in warning_message:
-            QMessageBox.warning(mainwin, "Warning", warning_message, QMessageBox.Ok)
+        QMessageBox.warning(mainwin, "Warning", warning_message, QMessageBox.Ok)
 
 
 class TemperatureDock(QDockWidget):
