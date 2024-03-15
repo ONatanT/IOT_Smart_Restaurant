@@ -22,7 +22,7 @@ table_presence = {}
 class Mqtt_client(QtCore.QObject):
     temperature_updated = QtCore.pyqtSignal(int, float)
     light_updated = QtCore.pyqtSignal(int, bool)
-    air_conditioner_updated = QtCore.pyqtSignal(int, bool)
+    air_conditioner_updated = QtCore.pyqtSignal(int, str)
     waiter_call_received = QtCore.pyqtSignal(int)
     table_presence_updated = QtCore.pyqtSignal(int, bool)
     warning_received = QtCore.pyqtSignal(str)
@@ -95,8 +95,8 @@ class Mqtt_client(QtCore.QObject):
                 self.light_updated.emit(table_number, is_on)
             elif topic == self.air_conditioner_topic:
                 table_number = data["table_number"]
-                is_on = data["is_on"]
-                self.air_conditioner_updated.emit(table_number, is_on)
+                mode = data["mode"]
+                self.air_conditioner_updated.emit(table_number, mode)
             elif topic == self.waiter_call_topic:
                 table_number = data["table_number"]
                 self.waiter_call_received.emit(table_number)
@@ -140,18 +140,18 @@ class Mqtt_client(QtCore.QObject):
             print(f"Table {table_number} does not exist in GUI dock. Adding it now.")
             mainwin.lightDock.add_table_to_dock(table_number, is_on)
 
-    @QtCore.pyqtSlot(int, bool)
-    def update_air_conditioner_slot(self, table_number, is_on):
+    @QtCore.pyqtSlot(int, str)
+    def update_air_conditioner_slot(self, table_number, mode):
         if table_number in table_air_conditioners:
             label = table_air_conditioners[table_number]
-            label.setText(f"Table: {table_number}, AC: {'On' if is_on else 'Off'}")
-            if is_on:
-                label.setStyleSheet("color: green;")
+            label.setText(f"Table: {table_number}, AC: {mode}")
+            if mode == 'Cooling':
+                label.setStyleSheet("color: blue;")
             else:
                 label.setStyleSheet("color: red;")
         else:
             print(f"Table {table_number} does not exist in GUI dock. Adding it now.")
-            mainwin.airConditionerDock.add_table_to_dock(table_number, is_on)
+            mainwin.airConditionerDock.add_table_to_dock(table_number, mode)
 
     @QtCore.pyqtSlot(int)
     def receive_waiter_call_slot(self, table_number):
@@ -261,15 +261,15 @@ class AirConditionerDock(QDockWidget):
         self.layout = QVBoxLayout(self.central_widget)
         self.sorted_table_numbers = []
 
-    def add_table_to_dock(self, table_number, is_on):
+    def add_table_to_dock(self, table_number, mode):
         widget = QWidget()
-        label = QLabel(f"Table: {table_number}, AC: {'On' if is_on else 'Off'}")
+        label = QLabel(f"Table: {table_number}, AC: {mode}")
         label.setAlignment(Qt.AlignCenter)
         widget_layout = QVBoxLayout(widget)
         widget_layout.addWidget(label)
 
-        if is_on:
-            label.setStyleSheet("color: green;")
+        if mode == "Cooling":
+            label.setStyleSheet("color: blue;")
         else:
             label.setStyleSheet("color: red;")
 

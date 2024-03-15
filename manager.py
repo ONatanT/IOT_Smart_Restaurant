@@ -13,7 +13,7 @@ c.execute('''CREATE TABLE IF NOT EXISTS occupancy_data
 c.execute('''CREATE TABLE IF NOT EXISTS light_data
              (table_number INTEGER PRIMARY KEY, is_on BOOLEAN)''')
 c.execute('''CREATE TABLE IF NOT EXISTS ac_data
-             (table_number INTEGER PRIMARY KEY, is_on BOOLEAN)''')
+             (table_number INTEGER PRIMARY KEY, mode TEXT)''')
 conn.commit()
 
 # MQTT Client setup
@@ -43,7 +43,8 @@ def handle_temperature(data):
     temperature = float(data["temperature"])  # Convert to float
     ac_topic = "tables/air_conditioner"
     warning_topic = "tables/warning"
-    threshold_temperature = 40  # Threshold temperature for warning
+    threshold_temperature = 25.0  # Threshold temperature for warning
+    threshold_temperature_waring = 40.0  # Threshold temperature for warning
 
     print(f"Received temperature data for table {table_number}: {temperature}")
 
@@ -53,18 +54,19 @@ def handle_temperature(data):
 
     # Check temperature threshold and control AC
     if temperature > threshold_temperature:
-        print(f"Temperature for table {table_number} is above threshold, turning on AC.")
-        message = f'{{"table_number": {table_number}, "is_on": {str(True).lower()}}}'
+        print(f"Temperature for table {table_number} is above threshold: Cooling.")
+        message = f'{{"table_number": {table_number}, "mode": "Cooling"}}'
         client.publish(ac_topic, message)
         print("AC control message sent.")
 
+        if temperature > threshold_temperature_waring:
         # Send warning message
-        warning_message = f'Temperature for table {table_number} is above 40°C!'
-        client.publish(warning_topic, warning_message)
-        print("Warning message sent.")
+            warning_message = f'Temperature for table {table_number} is above 40°C!'
+            client.publish(warning_topic, warning_message)
+            print("Warning message sent.")
     else:
-        print(f"Temperature for table {table_number} is below threshold, turning off AC.")
-        message = f'{{"table_number": {table_number}, "is_on": {str(False).lower()}}}'
+        print(f"Temperature for table {table_number} is below threshold: Heating.")
+        message = f'{{"table_number": {table_number}, "mode": "Heating"}}'
         client.publish(ac_topic, message)
         print("AC control message sent.")
 
@@ -103,12 +105,12 @@ def handle_light(data):
 # Function to handle air conditioner data
 def handle_ac(data):
     table_number = data["table_number"]
-    is_on = data["is_on"]
+    mode = data["mode"]
 
-    print(f"Received AC data for table {table_number}: {is_on}")
+    print(f"Received AC data for table {table_number}: {mode}")
 
     # Update or insert into database
-    c.execute("INSERT OR REPLACE INTO ac_data VALUES (?, ?)", (table_number, is_on))
+    c.execute("INSERT OR REPLACE INTO ac_data VALUES (?, ?)", (table_number, mode))
     conn.commit()
 
 # Setup MQTT client callbacks
