@@ -23,7 +23,10 @@ client = mqtt.Client("SmartRestaurantManager")
 def on_message(client, userdata, message):
     print("Received message:", message.payload.decode())
     topic = message.topic
-    payload = json.loads(message.payload.decode())
+    try:
+        payload = json.loads(message.payload.decode())
+    except:
+        payload = ""
 
     if "tmp" in topic:
         handle_temperature(payload)
@@ -38,8 +41,10 @@ def on_message(client, userdata, message):
 # Function to handle temperature data
 def handle_temperature(data):
     table_number = data["table_number"]
-    temperature = data["temperature"]
+    temperature = float(data["temperature"])  # Convert to float
     ac_topic = "tables/air_conditioner"
+    warning_topic = "tables/warning"
+    threshold_temperature = 40  # Threshold temperature for warning
 
     print(f"Received temperature data for table {table_number}: {temperature}")
 
@@ -53,12 +58,16 @@ def handle_temperature(data):
         message = f'{{"table_number": {table_number}, "is_on": {str(True).lower()}}}'
         client.publish(ac_topic, message)
         print("AC control message sent.")
+
+        # Send warning message
+        warning_message = f'Temperature for table {table_number} is above 40°C!'
+        client.publish(warning_topic, warning_message)
+        print("Warning message sent.")
     else:
         print(f"Temperature for table {table_number} is below threshold, turning off AC.")
         message = f'{{"table_number": {table_number}, "is_on": {str(False).lower()}}}'
         client.publish(ac_topic, message)
         print("AC control message sent.")
-
 
 # Function to handle occupancy data
 def handle_occupancy(data):
@@ -81,7 +90,6 @@ def handle_occupancy(data):
     c.execute("INSERT OR REPLACE INTO occupancy_data VALUES (?, ?)", (table_number, is_occupied))
     conn.commit()
 
-
 # Function to handle light data
 def handle_light(data):
     table_number = data["table_number"]
@@ -92,7 +100,6 @@ def handle_light(data):
     # Update or insert into database
     c.execute("INSERT OR REPLACE INTO light_data VALUES (?, ?)", (table_number, is_on))
     conn.commit()
-
 
 # Function to handle air conditioner data
 def handle_ac(data):
@@ -114,9 +121,6 @@ client.connect(broker_ip, int(broker_port))
 
 # Subscribe to MQTT topics
 client.subscribe(sub_topic)
-
-# Set temperature threshold
-threshold_temperature = 25  # Example threshold temperature
 
 # Start the MQTT loop
 client.loop_forever()

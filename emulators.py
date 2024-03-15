@@ -4,8 +4,6 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QPushButton,
 from PyQt5.QtCore import Qt
 from mqtt_init import *
 
-# TODO: convert temperature dock to DHT functionality
-
 class TemperatureDock(QDockWidget):
     def __init__(self):
         super().__init__("Temperature")

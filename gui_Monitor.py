@@ -1,4 +1,3 @@
-# gui_monitor.py
 import sys
 import random
 from PyQt5 import QtGui, QtCore, QtWidgets
@@ -8,7 +7,7 @@ from PyQt5.QtCore import *
 import paho.mqtt.client as mqtt
 import socket
 import json
-import  bisect
+import bisect
 
 # Import MQTT initialization parameters from mqtt_init.py
 from mqtt_init import *
@@ -21,11 +20,12 @@ table_waiter_calls = {}
 table_presence = {}
 
 class Mqtt_client(QtCore.QObject):
-    temperature_updated = QtCore.pyqtSignal(int, int)
+    temperature_updated = QtCore.pyqtSignal(int, float)
     light_updated = QtCore.pyqtSignal(int, bool)
     air_conditioner_updated = QtCore.pyqtSignal(int, bool)
     waiter_call_received = QtCore.pyqtSignal(int)
     table_presence_updated = QtCore.pyqtSignal(int, bool)
+    warning_received = QtCore.pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -33,17 +33,19 @@ class Mqtt_client(QtCore.QObject):
         # Creating unique client name
         r = random.randrange(1, 10000000)
         self.clientname = "IOT_client-Id-" + str(r)
-        
+
         # Initializing MQTT parameters
         self.broker = broker_ip
         self.port = int(broker_port)
         self.username = username
         self.password = password
+        self.warning_topic = "tables/warning"
         self.temperature_topic = "tables/tmp"
         self.light_topic = "tables/light"
         self.air_conditioner_topic = "tables/air_conditioner"
         self.waiter_call_topic = "tables/waiter_call"
         self.table_presence_topic = "tables/occupied"
+        self.warning_topic = "tables/warning"
 
         # Creating MQTT client instance
         self.client = mqtt.Client(self.clientname, clean_session=True)
@@ -61,23 +63,32 @@ class Mqtt_client(QtCore.QObject):
         self.air_conditioner_updated.connect(self.update_air_conditioner_slot)
         self.waiter_call_received.connect(self.receive_waiter_call_slot)
         self.table_presence_updated.connect(self.update_table_presence_slot)
-        
+        self.warning_received.connect(self.show_warning_popup)
+
     def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             print("Connected to broker")
             self.client.subscribe(sub_topic, 0)
+            self.client.subscribe(self.warning_topic, 0)  # Subscribe to the warning topic
         else:
             print("Bad connection. Returned code=", rc)
-            
+
     def on_disconnect(self, client, userdata, flags, rc=0):
         print("Disconnected from broker. Result code: ", str(rc))
-            
+
     def on_message(self, client, userdata, msg):
         topic = msg.topic
         payload = str(msg.payload.decode("utf-8", "ignore"))
         print("Message from:", topic, payload)
         try:
+            print(f"{(topic)=}")
+            print(f"{(self.warning_topic)=}")
+            print(f"{(self.warning_topic == topic)=}")
+
             data = json.loads(payload)
+            if self.warning_topic == topic:
+                print("********************************************")
+                self.warning_received.emit()
             if topic == self.temperature_topic:
                 table_number = data["table_number"]
                 temperature = data["temperature"]
@@ -102,17 +113,18 @@ class Mqtt_client(QtCore.QObject):
         except KeyError as e:
             print(f"Missing key: {str(e)}")
 
+
     def connect_to_broker(self):
         print("Connecting to broker ", self.broker)
         self.client.connect(self.broker, self.port)
         self.client.loop_start()
-        
+
     def disconnect_from_broker(self):
         self.client.disconnect()
         self.client.loop_stop()
 
-    #TODO: add a warning color to temp above 40 as a warning
-    @QtCore.pyqtSlot(int, int)
+    # TODO: add a warning color to temp above 40 as a warning
+    @QtCore.pyqtSlot(int, float)
     def update_temperature_slot(self, table_number, temperature):
         if table_number in table_temperatures:
             table_temperatures[table_number].setText(f"Table: {table_number}, Temperature: {temperature} °C")
@@ -170,13 +182,20 @@ class Mqtt_client(QtCore.QObject):
                 print(f"Table {table_number} is vacant.")
                 mainwin.presenceDock.remove_table_from_dock(table_number)
 
+    @QtCore.pyqtSlot(str)
+    def show_warning_popup(self, warning_message):
+        print("Received warning message:", warning_message)
+        if "Temperature for table 1 is above 40°C!" in warning_message:
+            QMessageBox.warning(mainwin, "Warning", warning_message, QMessageBox.Ok)
+
+
 class TemperatureDock(QDockWidget):
     def __init__(self, mc):
         QDockWidget.__init__(self)
-        
+
         self.mc = mc
         self.mc.connect_to_broker()
-        
+
         self.setWindowTitle("Temperature Sensors")
         self.setStyleSheet("background-color: white")
         self.central_widget = QWidget()
@@ -203,9 +222,9 @@ class TemperatureDock(QDockWidget):
 class LightDock(QDockWidget):
     def __init__(self, mc):
         QDockWidget.__init__(self)
-        
+
         self.mc = mc
-        
+
         self.setWindowTitle("Light Sensors")
         self.setStyleSheet("background-color: white")
         self.central_widget = QWidget()
@@ -224,7 +243,7 @@ class LightDock(QDockWidget):
             label.setStyleSheet("color: green;")
         else:
             label.setStyleSheet("color: red;")
-        
+
         if table_number not in self.sorted_table_numbers:
             self.sorted_table_numbers.append(table_number)
             self.sorted_table_numbers.sort()
@@ -237,11 +256,10 @@ class LightDock(QDockWidget):
 class AirConditionerDock(QDockWidget):
     def __init__(self, mc):
         QDockWidget.__init__(self)
-        
+
         self.mc = mc
-        
+
         self.setWindowTitle("Air Conditioner Sensors")
-        # self.setStyleSheet("background-color: white")
         self.setStyleSheet("QDockWidget { background-color: #f0f0f0; border: 1px solid #ccc; }")
 
         self.central_widget = QWidget()
@@ -283,7 +301,6 @@ class WaiterCallDock(QDockWidget):
         self.layout = QVBoxLayout(self.central_widget)
 
         self.mc.waiter_call_received.connect(self.add_table_to_dock)
-
 
     def add_table_to_dock(self, table_number):
         print(f"Waiter call received from table {table_number}")
@@ -339,14 +356,13 @@ class PresenceDock(QDockWidget):
             del table_presence[table_number]
             self.mc.sorted_table_numbers.remove(table_number)
 
-
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         QMainWindow.__init__(self, parent)
-                
+
         # Init of Mqtt_client class
         self.mc = Mqtt_client()
-        
+
         # general GUI settings
         self.setUnifiedTitleAndToolBarOnMac(True)
 
